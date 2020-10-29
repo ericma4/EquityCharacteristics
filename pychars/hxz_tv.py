@@ -24,11 +24,8 @@ conn = wrds.Connection()
 
 # CRSP Block
 crsp = conn.raw_sql("""
-                      select a.permno, a.date, a.ret, (a.ret - b.rf) as exret, b.mktrf
-                      from crsp.dsf as a
-                      left join ff.factors_daily as b
-                      on a.date=b.date
-                      where a.date >= '01/01/1959'
+                      select permno, date, ret
+                      from crsp.dsf
                       """)
 
 # sort variables by permno and date
@@ -52,11 +49,9 @@ crsp['sig'] = np.where(crsp['date_diff'] == crsp['min_diff'], 1, np.nan)
 
 # label every date of month end
 crsp['month_count'] = crsp[crsp['sig'] == 1].groupby(['permno']).cumcount()
-
 # label numbers of months for a firm
 month_num = crsp[crsp['sig'] == 1].groupby(['permno'])['month_count'].tail(1)
 month_num = month_num.astype(int)
-month_num = month_num.reset_index(drop=True)
 
 # mark the number of each month to each day of this month
 crsp['month_count'] = crsp.groupby(['permno'])['month_count'].fillna(method='bfill')
@@ -68,7 +63,6 @@ df_firm['permno'] = df_firm['permno'].astype(int)
 df_firm = df_firm.reset_index(drop=True)
 df_firm = df_firm.reset_index()
 df_firm = df_firm.rename(columns={'index': 'count'})
-df_firm['month_num'] = month_num
 
 ######################
 # Calculate residual #
@@ -77,32 +71,23 @@ df_firm['month_num'] = month_num
 
 def get_res_var(df, firm_list):
     """
-
     :param df: stock dataframe
     :param firm_list: list of firms matching stock dataframe
     :return: dataframe with variance of residual
     """
-    for firm, count, prog in zip(firm_list['permno'], firm_list['month_num'], range(firm_list['permno'].count()+1)):
+    for firm, count, prog in zip(firm_list['permno'], month_num, range(firm_list['permno'].count()+1)):
         prog = prog + 1
         print('processing permno %s' % firm, '/', 'finished', '%.2f%%' % ((prog/firm_list['permno'].count())*100))
         for i in range(count + 1):
             # if you want to change the rolling window, please change here: i - 2 means 3 months is a window.
-            temp = df[(df['permno'] == firm) & (i - 2 <= df['month_count']) & (df['month_count'] <= i)]
+            temp = df[(df['permno'] == firm) & (i - 1 <= df['month_count']) & (df['month_count'] < i)]
             # if observations in last 3 months are less 21, we drop the rvar of this month
-            if temp['permno'].count() < 20:
+            if temp['permno'].count() < 15:
                 pass
             else:
-                rolling_window = temp['permno'].count()
                 index = temp.tail(1).index
-                X = pd.DataFrame()
-                X[['mktrf']] = temp[['mktrf']]
-                X['intercept'] = 1
-                X = X[['intercept', 'mktrf']]
-                X = np.mat(X)
-                Y = np.mat(temp[['exret']])
-                res = (np.identity(rolling_window) - X.dot(X.T.dot(X).I).dot(X.T)).dot(Y)
-                res_var = res.var(ddof=1)
-                df.loc[index, 'rvar'] = res_var
+                rvar = temp['ret'].var(ddof = 1)
+                df.loc[index, 'rvar'] = rvar
     return df
 
 
@@ -151,6 +136,7 @@ def main(start, end, step):
     return result
 
 
+
 # calculate variance of residual through rolling window
 # Note: please split dataframe according to your CPU situation. For example, we split dataframe to (1-0)/0.05 = 20 sub
 # dataframes here, so the function will use 20 cores to calculate variance of residual.
@@ -159,9 +145,9 @@ if __name__ == '__main__':
 
 # process dataframe
 crsp = crsp.dropna(subset=['rvar'])  # drop NA due to rolling
-crsp = crsp.rename(columns={'rvar': 'rvar_capm'})
+crsp = crsp.rename(columns={'rvar': 'tv'})
 crsp = crsp.reset_index(drop=True)
 crsp = crsp[['permno', 'date', 'rvar_capm']]
 
-with open('rvar_capm.pkl', 'wb') as f:
+with open('tv.pkl', 'wb') as f:
     pkl.dump(crsp, f)

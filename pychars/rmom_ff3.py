@@ -1,4 +1,4 @@
-# CAPM residual variance
+# Fama & French 3 factors residual variance
 # Note: Please use the latest version of pandas, this version should support returning to pd.Series after rolling
 # To get a faster speed, we split the big dataframe into small ones
 # Then using different process to calculate the variance
@@ -22,53 +22,71 @@ import multiprocessing as mp
 ###################
 conn = wrds.Connection()
 
-# CRSP Block
-crsp = conn.raw_sql("""
-                      select a.permno, a.date, a.ret, (a.ret - b.rf) as exret, b.mktrf
-                      from crsp.dsf as a
-                      left join ff.factors_daily as b
-                      on a.date=b.date
+# CRSP Block. We use crsp.msf and ff.factors_monthly
+cr = conn.raw_sql("""
+                      select a.permno, a.date, a.ret from crsp.msf as a
                       where a.date >= '01/01/1959'
                       """)
 
-# sort variables by permno and date
+ff = conn.raw_sql("""
+                      select b.rf, b.mktrf, b.date,b.smb, b.hml from ff.factors_monthly as b
+                      where b.date >= '01/01/1959'
+                      """)
+
+ff['date'] = pd.to_datetime(ff['date']) + MonthEnd(0)
+cr['date'] = pd.to_datetime(cr['date']) + MonthEnd(0)
+
+crsp = pd.merge(cr,ff,how = 'left', on = ['date'])
+crsp['exret'] = crsp['ret'] - crsp['rf']
 crsp = crsp.sort_values(by=['permno', 'date'])
-
-# change variable format to int
 crsp['permno'] = crsp['permno'].astype(int)
+crsp = crsp[['permno','date','ret','exret','mktrf','smb','hml']]
 
-# Line up date to be end of month
-crsp['date'] = pd.to_datetime(crsp['date'])
-
-# find the closest trading day to the end of the month
-crsp['monthend'] = crsp['date'] + MonthEnd(0)
-crsp['date_diff'] = crsp['monthend'] - crsp['date']
-date_temp = crsp.groupby(['permno', 'monthend'])['date_diff'].min()
-date_temp = pd.DataFrame(date_temp)  # convert Series to DataFrame
-date_temp.reset_index(inplace=True)
-date_temp.rename(columns={'date_diff': 'min_diff'}, inplace=True)
-crsp = pd.merge(crsp, date_temp, how='left', on=['permno', 'monthend'])
-crsp['sig'] = np.where(crsp['date_diff'] == crsp['min_diff'], 1, np.nan)
-
-# label every date of month end
-crsp['month_count'] = crsp[crsp['sig'] == 1].groupby(['permno']).cumcount()
-
-# label numbers of months for a firm
-month_num = crsp[crsp['sig'] == 1].groupby(['permno'])['month_count'].tail(1)
-month_num = month_num.astype(int)
-month_num = month_num.reset_index(drop=True)
-
-# mark the number of each month to each day of this month
-crsp['month_count'] = crsp.groupby(['permno'])['month_count'].fillna(method='bfill')
-
-# crate a firm list
+# create a firm list. Use reset_index to create a count to number companies without duplicates
 df_firm = crsp.drop_duplicates(['permno'])
 df_firm = df_firm[['permno']]
 df_firm['permno'] = df_firm['permno'].astype(int)
 df_firm = df_firm.reset_index(drop=True)
 df_firm = df_firm.reset_index()
 df_firm = df_firm.rename(columns={'index': 'count'})
-df_firm['month_num'] = month_num
+
+#Extract number of data points for each permno
+crsp['month_count'] = crsp.groupby('permno').cumcount()
+month_num = crsp.groupby('permno')['month_count'].tail(1)
+month_num = month_num.astype(int)
+
+######################
+# Calculate the beta #
+######################
+# function that get multiple beta
+''''
+rolling_window = 60  # 60 trading days
+crsp['beta_mktrf'] = np.nan
+crsp['beta_smb'] = np.nan
+crsp['beta_hml'] = np.nan
+
+
+def get_beta(df):
+    """
+    The original idea of calculate beta is using formula (X'MX)^(-1)X'MY,
+    where M = I - 1(1'1)^{-1}1, I is a identity matrix.
+
+    """
+    temp = crsp.loc[df.index]  # extract the rolling sub dataframe from original dataframe
+    X = np.mat(temp[['mktrf', 'smb', 'hml']])
+    Y = np.mat(temp[['exret']])
+    ones = np.mat(np.ones(rolling_window)).T
+    M = np.identity(rolling_window) - ones.dot((ones.T.dot(ones)).I).dot(ones.T)
+    beta = (X.T.dot(M).dot(X)).I.dot((X.T.dot(M).dot(Y)))
+    crsp['beta_mktrf'].loc[df.index[-1:]] = beta[0]
+    crsp['beta_smb'].loc[df.index[-1:]] = beta[1]
+    crsp['beta_hml'].loc[df.index[-1:]] = beta[2]
+    return 0  # we do not need the rolling outcome since rolling cannot return different values in different columns
+
+
+# calculate beta through rolling window
+crsp_temp = crsp.groupby('permno').rolling(rolling_window).apply(get_beta, raw=False)
+'''
 
 ######################
 # Calculate residual #
@@ -82,27 +100,26 @@ def get_res_var(df, firm_list):
     :param firm_list: list of firms matching stock dataframe
     :return: dataframe with variance of residual
     """
-    for firm, count, prog in zip(firm_list['permno'], firm_list['month_num'], range(firm_list['permno'].count()+1)):
+    for firm, count, prog in zip(firm_list['permno'], month_num, range(firm_list['permno'].count()+1)):
         prog = prog + 1
         print('processing permno %s' % firm, '/', 'finished', '%.2f%%' % ((prog/firm_list['permno'].count())*100))
         for i in range(count + 1):
             # if you want to change the rolling window, please change here: i - 2 means 3 months is a window.
-            temp = df[(df['permno'] == firm) & (i - 2 <= df['month_count']) & (df['month_count'] <= i)]
-            # if observations in last 3 months are less 21, we drop the rvar of this month
+            temp = df[(df['permno'] == firm) & (i - 59 <= df['month_count']) & (df['month_count'] <= i)]
+            # if observations in last 3 months are less than 20, we drop the rvar of this month
             if temp['permno'].count() < 20:
                 pass
             else:
                 rolling_window = temp['permno'].count()
                 index = temp.tail(1).index
                 X = pd.DataFrame()
-                X[['mktrf']] = temp[['mktrf']]
+                X[['mktrf', 'smb', 'hml']] = temp[['mktrf', 'smb', 'hml']]
                 X['intercept'] = 1
-                X = X[['intercept', 'mktrf']]
+                X = X[['intercept', 'mktrf', 'smb', 'hml']]
                 X = np.mat(X)
                 Y = np.mat(temp[['exret']])
                 res = (np.identity(rolling_window) - X.dot(X.T.dot(X).I).dot(X.T)).dot(Y)
-                res_var = res.var(ddof=1)
-                df.loc[index, 'rvar'] = res_var
+                df.loc[index, 'res'] = res[-1]
     return df
 
 
@@ -132,6 +149,7 @@ def sub_df(start, end, step):
 
 def main(start, end, step):
     """
+
     :param start: the quantile to start cutting, usually it should be 0
     :param end: the quantile to end cutting, usually it should be 1
     :param step: quantile step
@@ -158,10 +176,23 @@ if __name__ == '__main__':
     crsp = main(0, 1, 0.05)
 
 # process dataframe
-crsp = crsp.dropna(subset=['rvar'])  # drop NA due to rolling
-crsp = crsp.rename(columns={'rvar': 'rvar_capm'})
+crsp = crsp.dropna(subset=['res'])  # drop NA due to rolling
+crsp = crsp.rename(columns={'res': 'rmom_ff3_1m'})
 crsp = crsp.reset_index(drop=True)
-crsp = crsp[['permno', 'date', 'rvar_capm']]
+crsp = crsp[['permno', 'date', 'rmom_ff3_1m']]
 
-with open('rvar_capm.pkl', 'wb') as f:
+def mom(start, end, df):
+    lag = pd.DataFrame()
+    result = 1
+    for i in range(start, end):
+        lag['mom%s' % i] = df.groupby(['permno'])['rmom_ff3_1m'].shift(i)
+        result = result * (1+lag['mom%s' % i])
+    result = result - 1
+    return result
+
+
+crsp['rmom_ff3_12m'] = mom(1,12,crsp)
+crsp['rmom_ff3_60m'] = mom(12,60,crsp)
+
+with open('rmom_ff3.pkl', 'wb') as f:
     pkl.dump(crsp, f)

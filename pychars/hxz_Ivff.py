@@ -1,4 +1,4 @@
-# CAPM residual variance
+# Fama & French 3 factors residual variance
 # Note: Please use the latest version of pandas, this version should support returning to pd.Series after rolling
 # To get a faster speed, we split the big dataframe into small ones
 # Then using different process to calculate the variance
@@ -24,11 +24,11 @@ conn = wrds.Connection()
 
 # CRSP Block
 crsp = conn.raw_sql("""
-                      select a.permno, a.date, a.ret, (a.ret - b.rf) as exret, b.mktrf
+                      select a.permno, a.date, a.ret, (a.ret - b.rf) as exret, b.mktrf, b.smb, b.hml
                       from crsp.dsf as a
                       left join ff.factors_daily as b
                       on a.date=b.date
-                      where a.date >= '01/01/1959'
+                      where a.date > '01/01/1959'
                       """)
 
 # sort variables by permno and date
@@ -56,7 +56,6 @@ crsp['month_count'] = crsp[crsp['sig'] == 1].groupby(['permno']).cumcount()
 # label numbers of months for a firm
 month_num = crsp[crsp['sig'] == 1].groupby(['permno'])['month_count'].tail(1)
 month_num = month_num.astype(int)
-month_num = month_num.reset_index(drop=True)
 
 # mark the number of each month to each day of this month
 crsp['month_count'] = crsp.groupby(['permno'])['month_count'].fillna(method='bfill')
@@ -68,7 +67,39 @@ df_firm['permno'] = df_firm['permno'].astype(int)
 df_firm = df_firm.reset_index(drop=True)
 df_firm = df_firm.reset_index()
 df_firm = df_firm.rename(columns={'index': 'count'})
-df_firm['month_num'] = month_num
+
+######################
+# Calculate the beta #
+######################
+# function that get multiple beta
+''''
+rolling_window = 60  # 60 trading days
+crsp['beta_mktrf'] = np.nan
+crsp['beta_smb'] = np.nan
+crsp['beta_hml'] = np.nan
+
+
+def get_beta(df):
+    """
+    The original idea of calculate beta is using formula (X'MX)^(-1)X'MY,
+    where M = I - 1(1'1)^{-1}1, I is a identity matrix.
+
+    """
+    temp = crsp.loc[df.index]  # extract the rolling sub dataframe from original dataframe
+    X = np.mat(temp[['mktrf', 'smb', 'hml']])
+    Y = np.mat(temp[['exret']])
+    ones = np.mat(np.ones(rolling_window)).T
+    M = np.identity(rolling_window) - ones.dot((ones.T.dot(ones)).I).dot(ones.T)
+    beta = (X.T.dot(M).dot(X)).I.dot((X.T.dot(M).dot(Y)))
+    crsp['beta_mktrf'].loc[df.index[-1:]] = beta[0]
+    crsp['beta_smb'].loc[df.index[-1:]] = beta[1]
+    crsp['beta_hml'].loc[df.index[-1:]] = beta[2]
+    return 0  # we do not need the rolling outcome since rolling cannot return different values in different columns
+
+
+# calculate beta through rolling window
+crsp_temp = crsp.groupby('permno').rolling(rolling_window).apply(get_beta, raw=False)
+'''
 
 ######################
 # Calculate residual #
@@ -82,22 +113,22 @@ def get_res_var(df, firm_list):
     :param firm_list: list of firms matching stock dataframe
     :return: dataframe with variance of residual
     """
-    for firm, count, prog in zip(firm_list['permno'], firm_list['month_num'], range(firm_list['permno'].count()+1)):
+    for firm, count, prog in zip(firm_list['permno'], month_num, range(firm_list['permno'].count()+1)):
         prog = prog + 1
         print('processing permno %s' % firm, '/', 'finished', '%.2f%%' % ((prog/firm_list['permno'].count())*100))
         for i in range(count + 1):
             # if you want to change the rolling window, please change here: i - 2 means 3 months is a window.
-            temp = df[(df['permno'] == firm) & (i - 2 <= df['month_count']) & (df['month_count'] <= i)]
+            temp = df[(df['permno'] == firm) & (i - 1 <= df['month_count']) & (df['month_count'] < i)]
             # if observations in last 3 months are less 21, we drop the rvar of this month
-            if temp['permno'].count() < 20:
+            if temp['permno'].count() < 21:
                 pass
             else:
                 rolling_window = temp['permno'].count()
                 index = temp.tail(1).index
                 X = pd.DataFrame()
-                X[['mktrf']] = temp[['mktrf']]
+                X[['mktrf', 'smb', 'hml']] = temp[['mktrf', 'smb', 'hml']]
                 X['intercept'] = 1
-                X = X[['intercept', 'mktrf']]
+                X = X[['intercept', 'mktrf', 'smb', 'hml']]
                 X = np.mat(X)
                 Y = np.mat(temp[['exret']])
                 res = (np.identity(rolling_window) - X.dot(X.T.dot(X).I).dot(X.T)).dot(Y)
@@ -132,6 +163,7 @@ def sub_df(start, end, step):
 
 def main(start, end, step):
     """
+
     :param start: the quantile to start cutting, usually it should be 0
     :param end: the quantile to end cutting, usually it should be 1
     :param step: quantile step
@@ -159,9 +191,9 @@ if __name__ == '__main__':
 
 # process dataframe
 crsp = crsp.dropna(subset=['rvar'])  # drop NA due to rolling
-crsp = crsp.rename(columns={'rvar': 'rvar_capm'})
+crsp = crsp.rename(columns={'rvar': 'Ivff'})
 crsp = crsp.reset_index(drop=True)
-crsp = crsp[['permno', 'date', 'rvar_capm']]
+crsp = crsp[['permno', 'date', 'Ivff']]
 
-with open('rvar_capm.pkl', 'wb') as f:
+with open('Ivff.pkl', 'wb') as f:
     pkl.dump(crsp, f)
