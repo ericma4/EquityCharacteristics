@@ -1,8 +1,7 @@
 ### Contact
 
-- Xin He
-- xinhe9701@gmail.com
-- [www.xinhesean.com](https://www.xinhesean.com)
+- Xin He (xinhe9701@gmail.com, [www.xinhesean.com](https://www.xinhesean.com))
+- Jianxin Ma (jianxin.ma@warwick.ac.uk)
 
 ### Version
 
@@ -59,7 +58,7 @@ For financial researches, we need equity characteristics. This repository is a t
 
 ### Data
 
-The date range is 1926 to 2021. The stock universe is top 3 exchanges (NYSE/AMEX/NASDAQ) in US.
+The date range is 1926 to 2024. The stock universe is top 3 exchanges (NYSE/AMEX/NASDAQ) in US.
 
 The currant time of data is $ret_t = \mathbf{X}_{t-1}$
 
