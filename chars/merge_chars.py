@@ -12,7 +12,7 @@ import wrds
 
 ######################################################################
 # read return data and fill the missing value in accounting files
-conn = wrds.Connection(wrds_username='yuanzwang5', wrds_password='yuanzwang5-c@my.cityu.edu.hk')
+conn = wrds.Connection()
 print(f"Connected to WRDS successfully!")
 crsp = conn.raw_sql("""
                     select a.prc, a.ret, a.retx, a.shrout, a.vol, a.date, a.permno, a.permco,

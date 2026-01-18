@@ -8,7 +8,7 @@ from functions import *
 ###################
 # Connect to WRDS #
 ###################
-conn = wrds.Connection(wrds_username='yuanzwang5', wrds_password='yuanzwang5-c@my.cityu.edu.hk')
+conn = wrds.Connection()
 print(f"Connected to WRDS successfully!")
 #######################################################################################################################
 #                                                    TTM functions                                                    #
