@@ -106,11 +106,14 @@ def get_baspread(df, firm_list):
             if temp['permno'].count() < 21:
                 pass
             else:
-                index = temp.tail(1).index
-                X = pd.DataFrame()
-                X[['vol', 'prc', 'retadj']] = temp[['vol', 'prc', 'retadj']]
-                ill = (abs(X['retadj']) / abs(X['prc'])*X['vol']).mean()
-                df.loc[index, 'ill'] = ill
+                if temp['vol'].notna().sum() < 21:
+                    pass
+                else:
+                    index = temp.tail(1).index
+                    X = pd.DataFrame()
+                    X[['vol', 'prc', 'retadj']] = temp[['vol', 'prc', 'retadj']]
+                    ill = ( abs(X['retadj']) / (abs(X['prc']) * X['vol']) ).mean() ##### Fixed bug on 2025.02.21 #####
+                    df.loc[index, 'ill'] = ill
     return df
 
 

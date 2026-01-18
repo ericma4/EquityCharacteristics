@@ -18,7 +18,7 @@ conn = wrds.Connection()
 
 # CRSP Block
 crsp = conn.raw_sql("""
-                    select permno, date, ret
+                    select permno, date, ret, vol
                     from crsp.dsf
                     where date >= '01/01/1959'
                     """)
@@ -101,9 +101,12 @@ def get_ret_var(df, firm_list):
             if temp['permno'].count() < 21:
                 pass
             else:
-                index = temp.tail(1).index
-                ret_var = temp['ret'].var()
-                df.loc[index, 'rvar'] = ret_var
+                if temp['vol'].notna().sum() < 21:
+                    pass
+                else:
+                    index = temp.tail(1).index
+                    ret_var = temp['ret'].var()
+                    df.loc[index, 'rvar'] = ret_var
     return df
 
 def sub_df(start, end, step):

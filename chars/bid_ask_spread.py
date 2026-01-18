@@ -25,7 +25,7 @@ conn = wrds.Connection()
 
 # CRSP Block
 crsp = conn.raw_sql("""
-                    select a.permno, a.date, a.ret, (a.ret - b.rf) as exret, a.askhi, a.bidlo
+                    select a.permno, a.date, a.ret, (a.ret - b.rf) as exret, a.askhi, a.bidlo, a.vol
                     from crsp.dsf as a
                     left join ff.factors_daily as b
                     on a.date=b.date
@@ -92,11 +92,14 @@ def get_baspread(df, firm_list):
             if temp['permno'].count() < 21:
                 pass
             else:
-                index = temp.tail(1).index
-                X = pd.DataFrame()
-                X[['askhi', 'bidlo']] = temp[['askhi', 'bidlo']]
-                bid = (X['askhi'] - X['bidlo'])/((X['askhi'] + X['bidlo'])/2).mean()
-                df.loc[index, 'baspread'] = bid
+                if temp['vol'].notna().sum() < 21:
+                    pass
+                else:
+                    index = temp.tail(1).index
+                    X = pd.DataFrame()
+                    X[['askhi', 'bidlo']] = temp[['askhi', 'bidlo']]
+                    bid = (X['askhi'] - X['bidlo'])/((X['askhi'] + X['bidlo'])/2).mean()
+                    df.loc[index, 'baspread'] = bid
     return df
 
 

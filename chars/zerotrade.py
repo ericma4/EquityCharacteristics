@@ -39,6 +39,9 @@ crsp['permno'] = crsp['permno'].astype(int)
 # Line up date to be end of month
 crsp['date'] = pd.to_datetime(crsp['date'])
 
+# make sure same unit for vol and shrout (Added on 2025.02.23)
+crsp['shrout'] = crsp['shrout'] * 1000 # from thousands to 1 unit
+
 # find the closest trading day to the end of the month
 crsp['monthend'] = crsp['date'] + MonthEnd(0)
 crsp['date_diff'] = crsp['monthend'] - crsp['date']
@@ -90,14 +93,18 @@ def get_baspread(df, firm_list):
             if temp['permno'].count() < 21:
                 pass
             else:
-                index = temp.tail(1).index
-                X = pd.DataFrame()
-                X[['vol', 'shrout']] = temp[['vol', 'shrout']]
-                X['countzero'] = np.where(X['vol'] == 0, 1, 0)
-                X['turn'] = (X['vol'] / X['shrout'])
-                X['turn'] = np.where(X['turn'] == 0, np.inf, X['turn'])
-                zerotrade = (X['countzero']+((1/X['turn'])/480000))*21/X['vol'].count()
-                df.loc[index, 'zerotrade'] = zerotrade
+                if temp['vol'].notna().sum() < 21:
+                    pass
+                else:
+                    index = temp.tail(1).index
+                    X = pd.DataFrame()
+                    X[['vol', 'shrout']] = temp[['vol', 'shrout']]
+                    X['countzero'] = np.where(X['vol'] == 0, 1, 0)
+                    X['turn'] = (X['vol'] / X['shrout'])
+                    X['turn'] = np.where(X['turn'] == 0, np.inf, X['turn'])
+                    # zerotrade = (X['countzero']+((1/X['turn'])/480000))*21/X['vol'].count()
+                    zerotrade = ( X['countzero'].sum() + (1 / (X['turn'].sum()) ) / 11000) * (21*3) / (X.shape[0]) ##### Fixed bug on 2025.02.23 #####
+                    df.loc[index, 'zerotrade'] = zerotrade
     return df
 
 

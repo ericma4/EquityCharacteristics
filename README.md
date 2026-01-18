@@ -1,11 +1,16 @@
 ### Contact
 
-- [Sean (Xin He)](https://www.xinhesean.com)
+- Xin He
+- xinhe9701@gmail.com
+- [www.xinhesean.com](https://www.xinhesean.com)
 
 ### Version
 
 - All in Python
 - The SAS version is here [EquityCharacteristicsSAS](https://feng-cityuhk.github.io/EquityCharacteristicsSAS/)
+
+- Extension to [China A Share Market](https://github.com/Quantactix/ChinaAShareEquityCharacteristics)
+- Extension to [Factors and Portfolios in China Market](https://github.com/mlfina/China-A-Sort)
 
 ## Academic Background
 

@@ -25,7 +25,7 @@ conn = wrds.Connection()
 
 # CRSP Block
 crsp = conn.raw_sql("""
-                      select a.permno, a.date, a.ret, b.rf, b.mktrf, b.smb, b.hml
+                      select a.permno, a.date, a.ret, a.vol, b.rf, b.mktrf, b.smb, b.hml
                       from crsp.dsf as a
                       left join ff.factors_daily as b
                       on a.date=b.date
@@ -143,17 +143,20 @@ def get_res_var(df, firm_list):
             if temp['permno'].count() < 21:
                 pass
             else:
-                rolling_window = temp['permno'].count()
-                index = temp.tail(1).index
-                X = pd.DataFrame()
-                X[['mktrf', 'smb', 'hml']] = temp[['mktrf', 'smb', 'hml']]
-                X['intercept'] = 1
-                X = X[['intercept', 'mktrf', 'smb', 'hml']]
-                X = np.mat(X)
-                Y = np.mat(temp[['exret']])
-                res = (np.identity(rolling_window) - X.dot(X.T.dot(X).I).dot(X.T)).dot(Y)
-                res_var = res.var(ddof=1)
-                df.loc[index, 'rvar'] = res_var
+                if temp['vol'].notna().sum() < 21:
+                    pass
+                else:
+                    rolling_window = temp['permno'].count()
+                    index = temp.tail(1).index
+                    X = pd.DataFrame()
+                    X[['mktrf', 'smb', 'hml']] = temp[['mktrf', 'smb', 'hml']]
+                    X['intercept'] = 1
+                    X = X[['intercept', 'mktrf', 'smb', 'hml']]
+                    X = np.mat(X)
+                    Y = np.mat(temp[['exret']])
+                    res = (np.identity(rolling_window) - X.dot(X.T.dot(X).I).dot(X.T)).dot(Y)
+                    res_var = res.var(ddof=1)
+                    df.loc[index, 'rvar'] = res_var
     return df
 
 

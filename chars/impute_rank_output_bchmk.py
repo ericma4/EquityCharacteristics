@@ -25,7 +25,7 @@ chars_a['jdate'] = pd.to_datetime(chars_a['jdate'])
 chars_a = chars_a.drop_duplicates(['permno', 'jdate'])
 
 # information list
-obs_var_list = ['gvkey', 'permno', 'jdate', 'sic', 'ret', 'retx', 'retadj', 'exchcd', 'shrcd']
+obs_var_list = ['gvkey', 'permno', 'jdate', 'ticker', 'conm', 'comnam', 'sic', 'ret', 'retx', 'retadj', 'exchcd', 'shrcd', 'prc', 'shrout']
 # characteristics with quarterly and annual frequency at the same time
 accounting_var_list = ['datadate', 'acc', 'bm', 'agr', 'alm', 'ato',  'cash', 'cashdebt', 'cfp', 'chcsho',
                        'chtx', 'depr', 'ep', 'gma', 'grltnoa', 'lev', 'lgr', 'ni', 'noa', 'op', 'pctacc', 'pm',
@@ -60,7 +60,7 @@ df_a = df_a.sort_values(obs_var_list)
 df_q = chars_q[obs_var_list + accounting_var_list + q_only_list]
 df_q.columns = obs_var_list + q_var_list + q_only_list
 # drop the same information columns for merging
-df_q = df_q.drop(['sic', 'ret', 'retx', 'retadj', 'exchcd', 'shrcd'], axis=1)
+df_q = df_q.drop(['sic', 'ret', 'retx', 'retadj', 'exchcd', 'shrcd', 'ticker', 'conm', 'comnam', 'prc', 'shrout'], axis=1)
 
 df = df_a.merge(df_q, how='left', on=['gvkey', 'jdate', 'permno'])
 
@@ -119,10 +119,12 @@ df_impute['ffi49'] = ffi49(df_impute)
 df_impute['ffi49'] = df_impute['ffi49'].fillna(49)  # we treat na in ffi49 as 'other'
 df_impute['ffi49'] = df_impute['ffi49'].astype(int)
 
-# there are two ways to impute: industrial median or mean
-df_impute = fillna_ind(df_impute, method='median', ffi=49)
+df_impute.replace([-np.inf, np.inf], np.nan, inplace=True)
 
-df_impute = fillna_all(df_impute, method='median')
+# there are two ways to impute: industrial median or mean
+df_impute = fillna_ind(df_impute, method='median', ffi=49, not_fill_col=obs_var_list)
+
+df_impute = fillna_all(df_impute, method='median', not_fill_col=obs_var_list)
 df_impute['re'] = df_impute['re'].fillna(0)  # re use IBES database, there are lots of missing data
 
 # df_impute['year'] = df_impute['date'].dt.year
@@ -147,14 +149,19 @@ with open('chars_rank_no_impute.feather', 'wb') as f:
     feather.write_feather(df_rank, f)
 
 # standardize imputed data
-df_rank = df_impute.copy()
-df_rank['lag_me'] = df_rank['me']
-df_rank = standardize(df_rank)
-# df_rank['year'] = df_rank['date'].dt.year
-# df_rank = df_rank[df_rank['year'] >= 1972]
-# df_rank = df_rank.drop(['year'], axis=1)
-df_rank['log_me'] = np.log(df_rank['lag_me'])
-df_rank.replace([-np.inf, np.inf], 0, inplace=True)
+# df_rank = df_impute.copy()
+
+# df_rank['lag_me'] = df_rank['me']
+# df_rank = standardize(df_rank)
+# # df_rank['year'] = df_rank['date'].dt.year
+# # df_rank = df_rank[df_rank['year'] >= 1972]
+# # df_rank = df_rank.drop(['year'], axis=1)
+# df_rank['log_me'] = np.log(df_rank['lag_me'])
+# df_rank.replace([-np.inf, np.inf], 0, inplace=True)
+# df_rank = pd.read_feather("chars_rank_no_impute.feather")
+
+char_list = [i for i in df_rank.columns if i.startswith("rank_")]
+df_rank[char_list] = df_rank[char_list].fillna(0)
 
 with open('chars_rank_imputed.feather', 'wb') as f:
     feather.write_feather(df_rank, f)

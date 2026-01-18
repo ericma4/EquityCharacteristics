@@ -39,6 +39,9 @@ crsp['permno'] = crsp['permno'].astype(int)
 # Line up date to be end of month
 crsp['date'] = pd.to_datetime(crsp['date'])
 
+# make sure same unit for vol and shrout (Added on 2025.02.23)
+crsp['shrout'] = crsp['shrout'] * 1000 # from thousands to 1 unit
+
 # find the closest trading day to the end of the month
 crsp['monthend'] = crsp['date'] + MonthEnd(0)
 crsp['date_diff'] = crsp['monthend'] - crsp['date']
@@ -90,11 +93,14 @@ def get_baspread(df, firm_list):
             if temp['permno'].count() < 21:
                 pass
             else:
-                index = temp.tail(1).index
-                X = pd.DataFrame()
-                X[['vol', 'shrout']] = temp[['vol', 'shrout']]
-                std_turn = (X['vol'] / X['shrout']).std()
-                df.loc[index, 'std_turn'] = std_turn
+                if temp['vol'].notna().sum() < 21:
+                    pass
+                else:
+                    index = temp.tail(1).index
+                    X = pd.DataFrame()
+                    X[['vol', 'shrout']] = temp[['vol', 'shrout']]
+                    std_turn = (X['vol'] / X['shrout']).std()
+                    df.loc[index, 'std_turn'] = std_turn
     return df
 
 

@@ -25,7 +25,7 @@ conn = wrds.Connection()
 
 # CRSP Block
 crsp = conn.raw_sql("""
-                      select a.permno, a.date, a.ret, b.rf, b.mktrf, b.smb, b.hml
+                      select a.permno, a.date, a.ret, a.vol, b.rf, b.mktrf, b.smb, b.hml
                       from crsp.dsf as a
                       left join ff.factors_daily as b
                       on a.date=b.date
@@ -110,14 +110,17 @@ def get_beta(df, firm_list):
             if temp['permno'].count() < 21:
                 pass
             else:
-                rolling_window = temp['permno'].count()
-                index = temp.tail(1).index
-                X = np.mat(temp[['mktrf']])
-                Y = np.mat(temp[['exret']])
-                ones = np.mat(np.ones(rolling_window)).T
-                M = np.identity(rolling_window) - ones.dot((ones.T.dot(ones)).I).dot(ones.T)
-                beta = (X.T.dot(M).dot(X)).I.dot((X.T.dot(M).dot(Y)))
-                df.loc[index, 'beta'] = beta
+                if temp['vol'].notna().sum() < 21:
+                    pass
+                else:
+                    rolling_window = temp['permno'].count()
+                    index = temp.tail(1).index
+                    X = np.mat(temp[['mktrf']])
+                    Y = np.mat(temp[['exret']])
+                    ones = np.mat(np.ones(rolling_window)).T
+                    M = np.identity(rolling_window) - ones.dot((ones.T.dot(ones)).I).dot(ones.T)
+                    beta = (X.T.dot(M).dot(X)).I.dot((X.T.dot(M).dot(Y)))
+                    df.loc[index, 'beta'] = beta
     return df
 
 
