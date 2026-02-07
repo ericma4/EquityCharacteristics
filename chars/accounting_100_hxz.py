@@ -310,20 +310,15 @@ data_rawa['ni'] = np.where(data_rawa['gvkey'] != data_rawa['gvkey'].shift(1),
                            np.log(data_rawa['csho'] * data_rawa['ajex']).replace(-np.inf, 0) -
                            np.log(data_rawa['csho_l1'] * data_rawa['ajex_l1']).replace(-np.inf, 0))
 
-# ope
+# op
 data_rawa['cogs0'] = np.where(data_rawa['cogs'].isnull(), 0, data_rawa['cogs'])
 data_rawa['xint0'] = np.where(data_rawa['xint'].isnull(), 0, data_rawa['xint'])
 data_rawa['xsga0'] = np.where(data_rawa['xsga'].isnull(), 0, data_rawa['xsga'])
 
 condlist = [data_rawa['revt'].isnull(), data_rawa['be'].isnull()]
 choicelist = [np.nan, np.nan]
-<<<<<<<< HEAD:chars/accounting_100_hxz.py
 data_rawa['op'] = np.select(condlist, choicelist,
                             default=(data_rawa['revt'] - data_rawa['cogs0'] - data_rawa['xsga0'] - data_rawa['xint0']) / data_rawa['be'])
-========
-data_rawa['ope'] = np.select(condlist, choicelist,
-                          default=(data_rawa['revt'] - data_rawa['cogs0'] - data_rawa['xsga0'] - data_rawa['xint0'])/data_rawa['be'])
->>>>>>>> origin/master:archive/accounting_60_hxz.py
 
 # rsup
 data_rawa['sale_l1'] = data_rawa.groupby(['permno'])['sale'].shift(1)
@@ -339,12 +334,8 @@ data_rawa['cash'] = data_rawa['che'] / data_rawa['at']
 # data_rawa['sp'] = data_rawa['sale']/data_rawa['me']
 
 # rd_sale
-<<<<<<<< HEAD:chars/accounting_100_hxz.py
-data_rawa['rd_sale'] = data_rawa['xrd'] / data_rawa['sale']
-========
 data_rawa['xrd0'] = np.where(data_rawa['xrd'].isnull(), 0, data_rawa['xrd'])
 data_rawa['rd_sale'] = data_rawa['xrd0']/data_rawa['sale']
->>>>>>>> origin/master:archive/accounting_60_hxz.py
 
 # rdm
 # data_rawa['rdm'] = data_rawa['xrd']/data_rawa['me']
@@ -424,17 +415,10 @@ data_rawa['cashdebt'] = (data_rawa['ib'] + data_rawa['dp']) / ((data_rawa['lt'] 
 
 # rd
 # if ((xrd/at)-(lag(xrd/lag(at))))/(lag(xrd/lag(at))) >.05 then rd=1 else rd=0
-<<<<<<<< HEAD:chars/accounting_100_hxz.py
-data_rawa['xrd/at_l1'] = data_rawa['xrd'] / data_rawa['at_l1']
-data_rawa['xrd/at_l1_l1'] = data_rawa.groupby(['permno'])['xrd/at_l1'].shift(1)
-data_rawa['rd'] = np.where(((data_rawa['xrd'] / data_rawa['at']) -
-                            (data_rawa['xrd/at_l1_l1'])) / data_rawa['xrd/at_l1_l1'] > 0.05, 1, 0)
-========
 data_rawa['xrd/at_l1'] = data_rawa['xrd0']/data_rawa['at_l1']
 data_rawa['xrd/at_l1_l1'] = data_rawa.groupby(['permno'])['xrd/at_l1'].shift(1)
 data_rawa['rd'] = np.where(((data_rawa['xrd0']/data_rawa['at'])-
                             (data_rawa['xrd/at_l1_l1']))/data_rawa['xrd/at_l1_l1']>0.05, 1, 0)
->>>>>>>> origin/master:archive/accounting_60_hxz.py
 
 # roa
 data_rawa['roa'] = data_rawa['ib'] / data_rawa['at_l1'] ##### Debug on 2025.02.23 #####
@@ -1215,11 +1199,10 @@ data_rawq['pscore'] = data_rawq['p_temp1']+data_rawq['p_temp2']+data_rawq['p_tem
 data_rawq = data_rawq.drop(['p_temp1', 'p_temp2', 'p_temp3', 'p_temp4', 'p_temp5', 'p_temp6', 'p_temp7', 'p_temp8',
                             'p_temp9'], axis=1)
 
-<<<<<<<< HEAD:chars/accounting_100_hxz.py
+
 ################## Added on 2022.09.06 ##################
 # cashpr
 # data_rawq['cashpr'] = ((data_rawq['me'] + data_rawq['dlttq'] - data_rawq['atq']) / data_rawq['cheq'])
-========
 ################## Added on 2024.03.12 ##################
 # opa from Ball el al. (2016)
 data_rawq['opa'] = (ttm4('revtq', data_rawq)-ttm4('cogsq0', data_rawq)-ttm4('xsgaq0', data_rawq)+data_rawq['xrdq4'])/data_rawq['atq_l4']
@@ -1243,7 +1226,7 @@ data_rawq['cop'] = (data_rawq['opa'] - (data_rawq['rectq']-data_rawq['rectq_l4']
                                      + (data_rawq['drcq']+data_rawq['drltq'])
                                      + (data_rawq['apq'] - data_rawq['apq_l4'])
                                      + (data_rawq['xaccq']-data_rawq['xaccq_l4']))/data_rawq['atq']
->>>>>>>> origin/master:archive/accounting_60_hxz.py
+
 
 #######################################################################################################################
 #                                                       Momentum                                                      #
@@ -1259,7 +1242,6 @@ crsp = conn.raw_sql("""
                     and b.exchcd between 1 and 3
                     """)
 
-<<<<<<<< HEAD:chars/accounting_100_hxz.py
 crsp = crsp.dropna(subset=['ret', 'retx', 'prc']).reset_index(drop=True)
 
 # change variable format to int
@@ -1406,15 +1388,9 @@ crsp_mom['dy'] = ttm12(series='mdivpay', df=crsp_mom)/crsp_mom['me']
 # populate the chars to monthly
 
 # data_rawa
-<<<<<<<< HEAD:chars/accounting_100_hxz.py
 data_rawa = data_rawa.drop(['date', 'ret', 'retx', 'me', 'prc', 'shrout'], axis=1)
 data_rawa = pd.merge(crsp_mom, data_rawa, how='left', on=['permno', 'jdate']).reset_index(drop=True)
 data_rawa = data_rawa.sort_values(by=['permno', 'jdate']).reset_index(drop=True)
-========
-data_rawa = data_rawa.drop(['date', 'ret', 'retx', 'me'], axis=1)
-data_rawa = pd.merge(crsp_mom, data_rawa, how='left', on=['permno', 'jdate'])
-data_rawa = data_rawa.sort_values(by=['permno', 'jdate'])
->>>>>>>> origin/master:archive/accounting_60_hxz.py
 data_rawa['datadate'] = data_rawa.groupby(['permno'])['datadate'].fillna(method='ffill')
 data_rawa[['permno1', 'datadate1']] = data_rawa[['permno', 'datadate']]  # avoid the bug of 'groupby' for py 3.8
 data_rawa = data_rawa.groupby(['permno1', 'datadate1'], as_index=False).fillna(method='ffill')
@@ -1422,15 +1398,9 @@ data_rawa = data_rawa[((data_rawa['exchcd'] == 1) | (data_rawa['exchcd'] == 2) |
                       ((data_rawa['shrcd'] == 10) | (data_rawa['shrcd'] == 11))].reset_index(drop=True)
 
 # data_rawq
-<<<<<<<< HEAD:chars/accounting_100_hxz.py
 data_rawq = data_rawq.drop(['date', 'ret', 'retx', 'me', 'prc', 'shrout'], axis=1)
 data_rawq = pd.merge(crsp_mom, data_rawq, how='left', on=['permno', 'jdate']).reset_index(drop=True)
 data_rawq = data_rawq.sort_values(by=['permno', 'jdate']).reset_index(drop=True)
-========
-data_rawq = data_rawq.drop(['date', 'ret', 'retx', 'me'], axis=1)
-data_rawq = pd.merge(crsp_mom, data_rawq, how='left', on=['permno', 'jdate'])
-data_rawa = data_rawa.sort_values(by=['permno', 'jdate'])
->>>>>>>> origin/master:archive/accounting_60_hxz.py
 data_rawq['datadate'] = data_rawq.groupby(['permno'])['datadate'].fillna(method='ffill')
 data_rawq[['permno1', 'datadate1']] = data_rawq[['permno', 'datadate']]  # avoid the bug of 'groupby' for py 3.8
 data_rawq = data_rawq.groupby(['permno1', 'datadate1'], as_index=False).fillna(method='ffill')
@@ -1503,13 +1473,8 @@ df_temp = data_rawa.groupby(['date', 'ffi49'], as_index=False)['mom12m'].mean().
 data_rawa = pd.merge(data_rawa, df_temp, how='left', on=['date', 'ffi49']).reset_index(drop=True)
 
 # Annual Accounting Variables
-<<<<<<<< HEAD:chars/accounting_100_hxz.py
 chars_a = data_rawa[['cusip', 'ncusip', 'gvkey', 'permno', 'exchcd', 'shrcd', 'datadate', 'jdate', 'ticker', 'conm', 'comnam', 'prc', 'shrout',
                      'sic', 'ret', 'retx', 'retadj', 'acc', 'agr', 'bm', 'cfp', 'ep', 'ni', 'op',
-========
-chars_a = data_rawa[['cusip', 'ncusip', 'gvkey', 'permno', 'exchcd', 'shrcd', 'datadate', 'jdate',
-                     'sic', 'ret', 'retx', 'retadj', 'acc', 'agr', 'bm', 'cfp', 'ep', 'ni', 'ope', 'opa', 'cop',
->>>>>>>> origin/master:archive/accounting_60_hxz.py
                      'rsup', 'cash', 'chcsho',
                      'rd', 'cashdebt', 'pctacc', 'gma', 'lev', 'rdm', 'adm', 'sgr', 'sp', 'invest', 'roe',
                      'rd_sale', 'lgr', 'roa', 'depr', 'egr', 'chato', 'chtx', 'noa', 'rna', 'pm', 'ato', 'dy',
