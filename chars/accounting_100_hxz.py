@@ -740,11 +740,7 @@ comp = conn.raw_sql("""
                     f.ibq, f.saleq, f.txtq, f.revtq, f.cogsq, f.xsgaq, f.revty, f.cogsy, f.saley,
 
                     /*balance sheet items*/
-<<<<<<<< HEAD:chars/accounting_100_hxz.py
-                    f.atq, f.actq, f.cheq, f.lctq, f.dlcq, f.ppentq, f.ppegtq, f.txpq,
-========
-                    f.atq, f.actq, f.cheq, f.lctq, f.dlcq, f.ppentq, f.ppegtq, f.drcq, f.drltq, f.xaccq,
->>>>>>>> origin/master:archive/accounting_60_hxz.py
+                    f.atq, f.actq, f.cheq, f.lctq, f.dlcq, f.ppentq, f.ppegtq, f.txpq, f.drcq, f.drltq, f.xaccq,
 
                     /*others*/
                     abs(f.prccq) as prccq, abs(f.prccq)*f.cshoq as mveq_f, f.ceqq, f.seqq, f.pstkq, f.ltq,
@@ -1278,12 +1274,11 @@ crsp2['me'] = crsp2['me']/1000 # CRSP ME in million unit
 
 crsp_mom = crsp2.copy()
 crsp_mom = crsp_mom.sort_values(by=['permno', 'date']).reset_index(drop=True)
-========
+
 crsp_mom['permno'] = crsp_mom['permno'].astype(int)
 crsp_mom['jdate'] = pd.to_datetime(crsp_mom['date']) + MonthEnd(0)
 crsp_mom = crsp_mom.dropna(subset=['ret', 'retx', 'prc'])
 crsp_mom = crsp_mom.sort_values(by=['permno', 'date'])
->>>>>>>> origin/master:archive/accounting_60_hxz.py
 
 # add delisting return
 dlret = conn.raw_sql("""
